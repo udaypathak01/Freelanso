@@ -1,0 +1,61 @@
+{
+  "name": "freelanso-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "lint": "eslint src tests",
+    "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\" \"*.js\"",
+    "test": "vitest run",
+    "test:rules": "firebase emulators:exec --project demo-freelanso-test --only auth,firestore,database \"npx vitest run tests/firestoreRules.emulator.test.js tests/conversations.emulator.test.js\"",
+    "test:indexes": "vitest run tests/searchIndexes.test.js",
+    "openapi:check": "node src/scripts/verifyOpenApi.js",
+    "load:test": "node src/scripts/loadTest.js",
+    "load:test:emu": "firebase emulators:exec --project demo-freelanso-test --only auth,firestore,database \"npm run load:test\"",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "set-role": "node src/scripts/setRole.js",
+    "seed:services": "node src/scripts/seedServices.js",
+    "seed:jobs": "node src/scripts/seedJobs.js",
+    "migrate:categories": "node src/scripts/migrateCategories.js",
+    "migrate:conversations": "node src/scripts/migrateConversations.js",
+    "test:emu": "firebase emulators:exec --project demo-freelanso-test --only auth,firestore,database \"npm test\"",
+    "prepare": "cd .. && husky server/.husky"
+  },
+  "dependencies": {
+    "compression": "1.8.2",
+    "cors": "2.8.5",
+    "dotenv": "16.6.1",
+    "express": "5.1.0",
+    "express-rate-limit": "8.7.1",
+    "firebase-admin": "^13.10.0",
+    "helmet": "8.1.0",
+    "pino": "9.9.0",
+    "pino-http": "10.5.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "@vitest/coverage-v8": "4.1.12",
+    "autocannon": "^8.0.0",
+    "eslint": "9.39.4",
+    "firebase": "^12.12.0",
+    "firebase-tools": "15.34.1",
+    "globals": "16.4.0",
+    "husky": "9.1.7",
+    "prettier": "3.6.2",
+    "supertest": "7.1.4",
+    "vitest": "4.1.12",
+    "yaml": "^2.9.1"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.6",
+    "@firebase/app-compat": "0.5.20",
+    "uuid": "^11.1.1"
+  }
+}

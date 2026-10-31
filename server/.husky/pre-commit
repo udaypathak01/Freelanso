@@ -1,0 +1,2 @@
+npm --prefix server run lint
+npm --prefix server test

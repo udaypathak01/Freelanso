@@ -1,0 +1,3175 @@
+openapi: 3.1.0
+info:
+  title: Freelanso API
+  version: 1.0.0
+  description: Health, identity, profiles, projects, services, jobs, and applications.
+servers:
+  - url: http://localhost:5000
+    description: Local development
+paths:
+  /healthz:
+    get:
+      summary: Check process liveness
+      security: []
+      responses:
+        "200":
+          description: The API process is live.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LivenessResponse"
+  /readyz:
+    get:
+      summary: Check Firestore readiness
+      security: []
+      responses:
+        "200":
+          description: Firestore is reachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+        "503":
+          description: Firestore is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/me:
+    get:
+      summary: Get the authenticated user's public identity
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Verified Firebase identity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          description: Missing, invalid, expired, or revoked Firebase token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Firebase Authentication verification is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/dashboard:
+    get:
+      summary: Get the authenticated user's dashboard data
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: projectCursor
+          in: query
+          description: Pass __done__ to omit project records when only continuing service pages.
+          schema:
+            type: string
+            maxLength: 2048
+        - name: serviceCursor
+          in: query
+          description: Pass __done__ to omit service records when only continuing project pages.
+          schema:
+            type: string
+            maxLength: 2048
+      responses:
+        "200":
+          description: Caller-owned listings, aggregate counts and real profile satisfaction data.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardResponse"
+        "400":
+          description: Invalid page limit or cursor.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/users/me:
+    get:
+      summary: Get the authenticated user's private profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Private profile, including email and private contact fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivateUserResponse"
+        "401":
+          description: Missing, invalid, expired, or revoked Firebase token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/users/{uid}:
+    parameters:
+      - in: path
+        name: uid
+        required: true
+        schema:
+          type: string
+          maxLength: 128
+    get:
+      summary: Get a public profile
+      security: []
+      responses:
+        "200":
+          description: Public profile without email, phone, or private address.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicUserResponse"
+        "404":
+          description: Profile not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: Update a profile (owner or admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdate"
+      responses:
+        "200":
+          description: Updated private profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivateUserResponse"
+        "400":
+          description: Invalid or unknown profile fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Caller is neither owner nor admin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/users/onboarding:
+    post:
+      summary: Set an account's freelancer/client role once
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [freelancer, client]
+      responses:
+        "201":
+          description: The account's initial role.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "400":
+          description: Invalid role or request fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: A different role has already been assigned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/uploads/sign:
+    post:
+      summary: Sign a restricted profile, project, or battle-media upload
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                purpose:
+                  type: string
+                  enum: [profile, project, battle]
+                  default: profile
+                resourceType:
+                  type: string
+                  enum: [image, video]
+      responses:
+        "200":
+          description: Cloudinary upload parameters for the authenticated user's folder.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadSignatureResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Cloudinary signing is not configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/projects:
+    get:
+      summary: List published projects
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum:
+              [
+                logo-design,
+                ui-ux-design,
+                web-development,
+                video-editing,
+                illustration,
+                content-writing,
+                seo-marketing,
+                motion-graphics,
+              ]
+        - name: q
+          in: query
+          description: Case-insensitive token search. Matching query tokens are ORed, then candidates are ranked in memory.
+          schema:
+            type: string
+            maxLength: 80
+        - name: skills
+          in: query
+          description: Comma-separated skill names; up to 10 values. Combined with q, skills are applied after candidate retrieval.
+          schema:
+            type: string
+            maxLength: 409
+        - name: sort
+          in: query
+          description: popular orders by likesCount descending, viewsCount descending, createdAt descending, and ID descending.
+          schema:
+            type: string
+            enum: [newest, oldest, price_asc, price_desc, popular]
+            default: newest
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 100000000
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 100000000
+      responses:
+        "200":
+          description: Cursor-paginated projects and owner summaries. Meta includes limit, nextCursor, appliedFilters, and total when aggregation is available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectPageResponse"
+        "400":
+          description: Invalid filters or cursor.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Publish a project (freelancer or admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectWrite"
+      responses:
+        "201":
+          description: Created project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "400":
+          description: Invalid project fields or media URL.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Only freelancers and admins can publish projects.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/projects/mine:
+    get:
+      summary: List the authenticated user's projects, including drafts
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Cursor-paginated projects owned by the caller.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectPageResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/projects/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 128
+    get:
+      summary: Get a published project or an owner's draft
+      security:
+        - bearerAuth: []
+        - {}
+      responses:
+        "200":
+          description: Project DTO with public owner summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "404":
+          description: Project does not exist or is not visible to the caller.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: Update an owned project (owner or admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated project DTO.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "400":
+          description: Invalid or protected project fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Caller does not own the project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Delete an owned project and its subcollections
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Project and nested Firestore documents were deleted.
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Caller does not own the project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Project not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/projects/{id}/like:
+    post:
+      summary: Toggle the caller's project like
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        "200":
+          description: Updated like state and count.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LikeResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Project not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/projects/{id}/comments:
+    get:
+      summary: List public project comments
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Cursor-paginated comments with public author summaries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentPageResponse"
+        "404":
+          description: Published project not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Add a plain-text project comment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+      responses:
+        "201":
+          description: Created comment DTO.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentResponse"
+        "400":
+          description: Invalid comment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Published project not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/projects/{id}/comments/{commentId}:
+    delete:
+      summary: Delete a comment as its author, project owner, or admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 128
+      responses:
+        "204":
+          description: Comment deleted.
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Caller cannot moderate this comment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Project or comment not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/jobs:
+    get:
+      summary: Search and list open jobs
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 80
+        - name: category
+          in: query
+          schema:
+            type: string
+            pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        - name: skills
+          in: query
+          description: Comma-separated skills; up to 10 values.
+          schema:
+            type: string
+            maxLength: 409
+        - name: minPrice
+          in: query
+          description: Minimum requested budget; matches jobs whose budgetMax reaches this value.
+          schema:
+            type: number
+            minimum: 0
+        - name: maxPrice
+          in: query
+          description: Maximum requested budget; matches jobs whose budgetMin is at or below this value.
+          schema:
+            type: number
+            minimum: 0
+        - name: jobType
+          in: query
+          schema:
+            type: string
+            enum: [freelance, part-time, full-time, contract, internship]
+        - name: location
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+        - name: sort
+          in: query
+          description: popular sorts by application count, then creation time and ID descending.
+          schema:
+            type: string
+            enum: [newest, oldest, price_asc, price_desc, popular]
+            default: newest
+      responses:
+        "200":
+          description: Cursor-paginated open jobs with public owner summaries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobPageResponse"
+        "400":
+          description: Invalid search, filter, sort, or cursor.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create a job (client or admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobWrite"
+      responses:
+        "201":
+          description: Created open job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobResponse"
+        "400":
+          description: Invalid or protected job fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Only clients and admins can post jobs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/jobs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      summary: Get a job
+      security: []
+      responses:
+        "200":
+          description: Job DTO with a public owner summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobResponse"
+        "404":
+          description: Job not found or deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: Update a job as its owner or an admin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobUpdate"
+      responses:
+        "200":
+          description: Updated job DTO.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobResponse"
+        "400":
+          description: Invalid or protected job fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Caller does not own the job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Job not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Soft-delete a job as its owner or an admin
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Job marked deleted; application history remains.
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Caller does not own the job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Job not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/jobs/{id}/applications:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      summary: List a job's applications as its owner
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Cursor-paginated applications with public applicant summaries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationPageResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Caller is not the job owner.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Job not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Apply to an open job as a freelancer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationWrite"
+      responses:
+        "201":
+          description: Created application.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResponse"
+        "400":
+          description: Invalid application fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Only freelancers can apply; applicants cannot apply to their own job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Job is closed or the applicant already applied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/applications/me:
+    get:
+      summary: List the authenticated user's applications
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Cursor-paginated applications submitted by the caller.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationPageResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/applications/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 300
+    patch:
+      summary: Update application status using the allowed state transitions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationStatusUpdate"
+      responses:
+        "200":
+          description: Updated application.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResponse"
+        "400":
+          description: Invalid status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Caller is neither the applicant nor the job owner.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Application not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Requested state transition is not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/meta/categories:
+    get:
+      summary: List canonical service categories
+      security: []
+      responses:
+        "200":
+          description: Canonical service category slugs and display labels.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceCategoryResponse"
+  /api/services:
+    get:
+      summary: List published services
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - name: q
+          in: query
+          description: Case-insensitive token search ranked within each cursor page.
+          schema:
+            type: string
+            maxLength: 80
+        - name: skills
+          in: query
+          description: Comma-separated skill names; up to 10 values.
+          schema:
+            type: string
+            maxLength: 409
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum:
+              [
+                design-creative,
+                video-animation,
+                writing-translation,
+                digital-marketing,
+                tech-development,
+                ai-automation,
+                business-legal,
+              ]
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 100000000
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 100000000
+        - name: sort
+          in: query
+          description: popular orders by ratingAvg descending, ratingCount descending, createdAt descending, and ID descending.
+          schema:
+            type: string
+            enum: [newest, oldest, price_asc, price_desc, popular]
+            default: newest
+      responses:
+        "200":
+          description: Cursor-paginated services. Popular uses rating average, rating count, createdAt descending, then ID descending. Meta includes applied filters and total when available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServicePageResponse"
+        "400":
+          description: Invalid filters or cursor.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create a service (freelancer or admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceWrite"
+      responses:
+        "201":
+          description: Created service DTO.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceResponse"
+        "400":
+          description: Invalid service fields or media.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Only freelancers and admins can publish services.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/services/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      summary: Get a published service
+      security: []
+      responses:
+        "200":
+          description: Public service DTO with public owner summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceResponse"
+        "404":
+          description: Service not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: Update an owned service or admin-managed service
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceUpdate"
+      responses:
+        "200":
+          description: Updated service DTO.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceResponse"
+        "400":
+          description: Invalid or protected service fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Caller is neither owner nor admin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Service not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Delete an owned service or admin-managed service
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Service deleted.
+        "401":
+          description: Authentication is required.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Caller is neither owner nor admin.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Service not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/battles:
+    get:
+      summary: List cursor-paginated skill battles
+      security: []
+      parameters:
+        - name: filter
+          in: query
+          schema:
+            type: string
+            enum: [all, live, ended]
+            default: all
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            maxLength: 2048
+      responses:
+        "200":
+          description: Battle DTOs with cursor metadata.
+    post:
+      summary: Create a battle with two to six options
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [title, category, options, endsAt]
+              properties:
+                title:
+                  type: string
+                  minLength: 4
+                  maxLength: 120
+                description:
+                  type: string
+                  maxLength: 2000
+                category:
+                  type: string
+                endsAt:
+                  type: string
+                  format: date-time
+                options:
+                  type: array
+                  minItems: 2
+                  maxItems: 6
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [title, description, imageUrl]
+                    properties:
+                      title:
+                        type: string
+                        minLength: 1
+                        maxLength: 100
+                      description:
+                        type: string
+                        minLength: 1
+                        maxLength: 1200
+                      imageUrl:
+                        type: string
+                        format: uri
+                      author:
+                        type: string
+                        maxLength: 80
+      responses:
+        "201":
+          description: Created battle DTO.
+        "400":
+          description: Invalid input or non-Cloudinary image URL.
+        "401":
+          description: Authentication is required.
+  /api/battles/{id}:
+    get:
+      summary: Get a battle, including the caller's vote when authenticated
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Battle DTO.
+        "404":
+          description: Battle not found.
+  /api/battles/{id}/user-vote:
+    get:
+      summary: Get the authenticated user's vote for a battle
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Whether and which option the caller voted for.
+        "401":
+          description: Authentication is required.
+        "404":
+          description: Battle not found.
+  /api/battles/{id}/vote:
+    post:
+      summary: Vote once for an option in an open battle
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [optionId]
+              properties:
+                optionId:
+                  type: string
+                  pattern: "^[A-Z]$"
+      responses:
+        "200":
+          description: Updated battle DTO.
+        "400":
+          description: Invalid option ID.
+        "401":
+          description: Authentication is required.
+        "409":
+          description: Battle is closed or the caller has already voted.
+  /api/search/smart:
+    post:
+      summary: Search published projects with optional Gemini ranking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+                filters:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    category:
+                      type: string
+                    skills:
+                      type: array
+                      minItems: 1
+                      maxItems: 10
+                      items:
+                        type: string
+                    minPrice:
+                      type: number
+                      minimum: 0
+                    maxPrice:
+                      type: number
+                      minimum: 0
+                    sort:
+                      type: string
+                      enum: [newest, oldest, price_asc, price_desc, popular]
+      responses:
+        "200":
+          description: Hydrated project results from the bounded candidate set; meta.degraded indicates fallback.
+        "400":
+          description: Invalid query or filters.
+        "401":
+          description: Authentication is required.
+        "429":
+          description: Per-user daily quota or AI rate limit exceeded.
+  /api/matches/score-all:
+    post:
+      summary: Score freelancer profiles for a caller-owned project
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [projectId]
+              properties:
+                projectId:
+                  type: string
+      responses:
+        "200":
+          description: Deterministically ranked safe freelancer DTOs and score breakdowns.
+        "401":
+          description: Authentication is required.
+        "403":
+          description: Caller does not own the project and is not an admin.
+        "404":
+          description: Project not found.
+        "429":
+          description: AI rate limit exceeded.
+  /api/support/tickets:
+    post:
+      summary: Submit an optional-auth support ticket
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            maxLength: 200
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, email, subject, message]
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                email:
+                  type: string
+                  format: email
+                  maxLength: 254
+                subject:
+                  type: string
+                  minLength: 3
+                  maxLength: 120
+                message:
+                  type: string
+                  minLength: 10
+                  maxLength: 5000
+                companyWebsite:
+                  type: string
+                  maxLength: 500
+      responses:
+        "201":
+          description: Ticket accepted or existing idempotent ticket returned.
+        "400":
+          description: Invalid ticket or populated honeypot.
+        "429":
+          description: Support rate limit exceeded.
+    get:
+      summary: List support tickets (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cursor-paginated support tickets.
+        "401":
+          description: Authentication is required.
+        "403":
+          description: Administrator role is required.
+  /api/support/tickets/me:
+    get:
+      summary: List the caller's support tickets
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cursor-paginated private ticket records.
+        "401":
+          description: Authentication is required.
+  /api/support/tickets/{id}/status:
+    patch:
+      summary: Transition a support ticket (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [open, in_progress, resolved]
+      responses:
+        "200":
+          description: Updated ticket DTO.
+        "403":
+          description: Administrator role is required.
+        "409":
+          description: Invalid ticket status transition.
+  /api/conversations:
+    get:
+      summary: List the caller's conversations and unread counts
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Conversations ordered by latest activity with participant summaries.
+        "401":
+          description: Authentication is required.
+    post:
+      summary: Create or retrieve a conversation with one recipient
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              anyOf:
+                - required: [recipientId]
+                - required: [recipientUid]
+              properties:
+                recipientId:
+                  type: string
+                  maxLength: 128
+                recipientUid:
+                  type: string
+                  maxLength: 128
+                postId:
+                  type: string
+                  maxLength: 128
+      responses:
+        "201":
+          description: Canonical conversation with participants as a UID array.
+        "400":
+          description: Invalid request or self-conversation.
+        "401":
+          description: Authentication is required.
+        "404":
+          description: Recipient profile not found.
+  /api/conversations/unread-count:
+    get:
+      summary: Get the caller's total unread message count
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Unread count for the authenticated user.
+        "401":
+          description: Authentication is required.
+  /api/conversations/{id}/messages:
+    get:
+      summary: Get a paginated conversation message history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: before
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 30
+      responses:
+        "200":
+          description: Messages ordered oldest-first within the returned page; metadata contains the older-page cursor.
+        "401":
+          description: Authentication is required.
+        "403":
+          description: Caller is not a conversation participant.
+        "404":
+          description: Conversation not found.
+    post:
+      summary: Send an authenticated conversation message
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [text, tempId]
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                tempId:
+                  type: string
+                  maxLength: 128
+      responses:
+        "201":
+          description: Stored message with idempotent client tempId.
+        "400":
+          description: Message text is invalid.
+        "401":
+          description: Authentication is required.
+        "403":
+          description: Caller is not a conversation participant.
+        "404":
+          description: Conversation not found.
+        "429":
+          description: More than 20 messages were sent in 10 seconds.
+  /api/conversations/{id}/read:
+    post:
+      summary: Mark incoming messages in a conversation as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        "200":
+          description: Read receipts were updated.
+        "401":
+          description: Authentication is required.
+        "403":
+          description: Caller is not a conversation participant.
+        "404":
+          description: Conversation not found.
+  /api/wallet:
+    get:
+      summary: Get the caller's internal wallet balance
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Available and pending balances in integer minor currency units.
+        "401":
+          description: Authentication is required.
+  /api/withdrawals:
+    post:
+      summary: Reserve available wallet funds for internal withdrawal processing
+      description: This request does not trigger a Stripe Connect transfer or payout.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [amount]
+              properties:
+                amount:
+                  type: integer
+                  description: Integer minor currency units (paise for INR).
+                  minimum: 10000
+                  maximum: 1000000
+      responses:
+        "201":
+          description: Pending withdrawal and ledger entry created.
+        "400":
+          description: Invalid amount or missing idempotency key.
+        "401":
+          description: Authentication is required.
+        "409":
+          description: Insufficient funds or idempotency key conflict.
+  /api/withdrawals/me:
+    get:
+      summary: List the caller's withdrawals
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cursor-paginated withdrawal DTOs.
+        "401":
+          description: Authentication is required.
+  /api/withdrawals/{id}/status:
+    patch:
+      summary: Approve or reject a withdrawal (admin only)
+      description: Rejection restores reserved funds; approval does not initiate a payout.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [approved, rejected]
+      responses:
+        "200":
+          description: Updated withdrawal DTO.
+        "403":
+          description: Administrator role is required.
+        "409":
+          description: Withdrawal was already processed.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Firebase ID token
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 20
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+        maxLength: 2048
+    ProjectId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        maxLength: 128
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          const: true
+        data:
+          type: object
+        meta:
+          type: object
+    LivenessResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  const: ok
+    ReadinessResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  const: ready
+    MeResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [uid, email, role, emailVerified]
+              properties:
+                uid:
+                  type: string
+                email:
+                  type: [string, "null"]
+                  format: email
+                role:
+                  type: [string, "null"]
+                  enum: [freelancer, client, admin, null]
+                emailVerified:
+                  type: boolean
+    DashboardResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required:
+                [
+                  projects,
+                  services,
+                  pagination,
+                  counts,
+                  engagement,
+                  applications,
+                  earnings,
+                  satisfaction,
+                ]
+              properties:
+                projects:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Project"
+                services:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Service"
+                pagination:
+                  type: object
+                  required: [limit, projectsNextCursor, servicesNextCursor]
+                  properties:
+                    limit:
+                      type: integer
+                    projectsNextCursor:
+                      type: [string, "null"]
+                    servicesNextCursor:
+                      type: [string, "null"]
+                counts:
+                  type: object
+                  properties:
+                    projects:
+                      $ref: "#/components/schemas/ListingStatusCounts"
+                    services:
+                      $ref: "#/components/schemas/ListingStatusCounts"
+                    listings:
+                      type: integer
+                engagement:
+                  type: object
+                  required: [likes, comments, views]
+                  properties:
+                    likes:
+                      type: integer
+                    comments:
+                      type: integer
+                    views:
+                      type: integer
+                applications:
+                  type: object
+                  description: Zero until application storage is implemented.
+                  required: [sent, received]
+                  properties:
+                    sent:
+                      type: integer
+                    received:
+                      type: integer
+                earnings:
+                  type: object
+                  description: Zero with null currency until a ledger is implemented.
+                  required: [total, currency]
+                  properties:
+                    total:
+                      type: number
+                    currency:
+                      type: [string, "null"]
+                satisfaction:
+                  type: object
+                  required: [ratingAvg, ratingCount]
+                  properties:
+                    ratingAvg:
+                      type: [number, "null"]
+                    ratingCount:
+                      type: integer
+    ListingStatusCounts:
+      type: object
+      required: [total, byStatus]
+      properties:
+        total:
+          type: integer
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+    PublicUserResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PublicUser"
+    PrivateUserResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              allOf:
+                - $ref: "#/components/schemas/PublicUser"
+                - type: object
+                  required: [email, phone, privateAddress]
+                  properties:
+                    email:
+                      type: [string, "null"]
+                    phone:
+                      type: string
+                    privateAddress:
+                      type: object
+    PublicUser:
+      type: object
+      required: [id, displayName, role, headline, bio, skills, location, stats]
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        photoURL:
+          type: [string, "null"]
+        role:
+          type: [string, "null"]
+          enum: [freelancer, client, admin, null]
+        headline:
+          type: string
+        bio:
+          type: string
+        handle:
+          type: string
+        bannerURL:
+          type: [string, "null"]
+        skills:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+        hourlyRate:
+          type: [number, "null"]
+        location:
+          type: object
+          properties:
+            country:
+              type: string
+            state:
+              type: string
+            city:
+              type: string
+        languages:
+          type: array
+          items:
+            type: object
+        socialLinks:
+          type: object
+        stats:
+          type: object
+          properties:
+            projectsCount:
+              type: integer
+            ratingAvg:
+              type: number
+            ratingCount:
+              type: integer
+        experience:
+          type: array
+          items:
+            type: object
+        education:
+          type: array
+          items:
+            type: object
+        certifications:
+          type: array
+          items:
+            type: object
+        createdAt:
+          type: [string, "null"]
+          format: date-time
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+    ProfileUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 80
+        headline:
+          type: string
+          maxLength: 120
+        bio:
+          type: string
+          maxLength: 2000
+        handle:
+          type: string
+          maxLength: 40
+        photoURL:
+          type: string
+          format: uri
+        bannerURL:
+          type: string
+          format: uri
+        phone:
+          type: string
+          maxLength: 30
+        location:
+          type: object
+          additionalProperties: false
+          properties:
+            country:
+              type: string
+              maxLength: 80
+            state:
+              type: string
+              maxLength: 80
+            city:
+              type: string
+              maxLength: 80
+        privateAddress:
+          type: object
+          additionalProperties: false
+          properties:
+            line1:
+              type: string
+              maxLength: 160
+            line2:
+              type: string
+              maxLength: 160
+            postalCode:
+              type: string
+              maxLength: 24
+        skills:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+            minLength: 1
+            maxLength: 40
+        hourlyRate:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1000000
+        languages:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            additionalProperties: false
+            required: [lang, proficiency]
+            properties:
+              lang:
+                type: string
+                maxLength: 40
+              proficiency:
+                type: string
+                maxLength: 40
+        socialLinks:
+          type: object
+          additionalProperties: false
+          properties:
+            website:
+              type: string
+              format: uri
+            linkedin:
+              type: string
+              format: uri
+            github:
+              type: string
+              format: uri
+            twitter:
+              type: string
+              format: uri
+            dribbble:
+              type: string
+              format: uri
+            behance:
+              type: string
+              format: uri
+        experience:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+        education:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+        certifications:
+          type: array
+          maxItems: 30
+          items:
+            type: object
+    RoleResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [freelancer, client]
+    UploadSignatureResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required:
+                [
+                  cloudName,
+                  apiKey,
+                  timestamp,
+                  assetFolder,
+                  uploadPreset,
+                  signature,
+                ]
+              properties:
+                cloudName:
+                  type: string
+                apiKey:
+                  type: string
+                timestamp:
+                  type: integer
+                assetFolder:
+                  type: string
+                uploadPreset:
+                  type: string
+                resourceType:
+                  type: string
+                  enum: [image, video]
+                allowedFormats:
+                  type: string
+                maxFileSize:
+                  type: integer
+                signature:
+                  type: string
+    ProjectWrite:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          title,
+          description,
+          category,
+          tags,
+          skills,
+          price,
+          deliveryDays,
+        ]
+      anyOf:
+        - required: [images]
+        - required: [media]
+      properties:
+        title:
+          type: string
+          minLength: 4
+          maxLength: 80
+        description:
+          type: string
+          minLength: 100
+          maxLength: 500
+        category:
+          type: string
+          enum:
+            [
+              logo-design,
+              ui-ux-design,
+              web-development,
+              video-editing,
+              illustration,
+              content-writing,
+              seo-marketing,
+              motion-graphics,
+            ]
+        tags:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 40
+        skills:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+            maxLength: 40
+        price:
+          type: number
+          minimum: 1
+          maximum: 100000000
+        deliveryDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+        level:
+          type: string
+          enum: [Beginner, Intermediate, Expert]
+        images:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/ProjectAsset"
+        media:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/ProjectAsset"
+        links:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/ProjectLink"
+    ProjectUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: Partial project fields only; ownerId, status, counters, and timestamps are not allowed.
+      properties:
+        title:
+          type: string
+          minLength: 4
+          maxLength: 80
+        description:
+          type: string
+          minLength: 100
+          maxLength: 500
+        category:
+          type: string
+          enum:
+            [
+              logo-design,
+              ui-ux-design,
+              web-development,
+              video-editing,
+              illustration,
+              content-writing,
+              seo-marketing,
+              motion-graphics,
+            ]
+        tags:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 40
+        skills:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+            maxLength: 40
+        price:
+          type: number
+          minimum: 1
+          maximum: 100000000
+        deliveryDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+        level:
+          type: string
+          enum: [Beginner, Intermediate, Expert]
+        images:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/ProjectAsset"
+        media:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/ProjectAsset"
+        links:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/ProjectLink"
+    ProjectAsset:
+      type: object
+      additionalProperties: false
+      required: [url, publicId, mediaType, resourceType]
+      properties:
+        url:
+          type: string
+          format: uri
+        publicId:
+          type: string
+        mediaType:
+          type: string
+          enum: [image, video]
+        resourceType:
+          type: string
+          enum: [image, video]
+        type:
+          type: string
+          enum: [image, video]
+        isCover:
+          type: boolean
+    ProjectLink:
+      type: object
+      additionalProperties: false
+      required: [label, url]
+      properties:
+        label:
+          type: string
+          enum: [Live Demo, GitHub, Behance, Figma, Dribbble, Website, Other]
+        url:
+          type: string
+          format: uri
+          pattern: "^https?://"
+    ProjectMedia:
+      type: object
+      required: [url, type, isCover, resourceType]
+      properties:
+        url:
+          type: string
+          format: uri
+        publicId:
+          type: string
+        type:
+          type: string
+          enum: [image, video]
+        isCover:
+          type: boolean
+        resourceType:
+          type: string
+          enum: [image, video]
+    Project:
+      type: object
+      required:
+        [
+          id,
+          ownerId,
+          title,
+          description,
+          category,
+          tags,
+          skills,
+          price,
+          deliveryDays,
+          images,
+          media,
+          links,
+          status,
+          likesCount,
+          commentsCount,
+          viewsCount,
+          owner,
+        ]
+      properties:
+        id:
+          type: string
+        ownerId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        categoryLabel:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        skills:
+          type: array
+          items:
+            type: string
+        price:
+          type: number
+        deliveryDays:
+          type: integer
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectAsset"
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectMedia"
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectLink"
+        status:
+          type: string
+          enum: [draft, published, archived]
+        likesCount:
+          type: integer
+        commentsCount:
+          type: integer
+        viewsCount:
+          type: integer
+        owner:
+          type: object
+          required: [id, displayName, photoURL, ratingAvg]
+          properties:
+            id:
+              type: string
+            displayName:
+              type: string
+            photoURL:
+              type: [string, "null"]
+            ratingAvg:
+              type: number
+        authorUid:
+          type: string
+        author:
+          type: object
+          required: [name, avatar]
+          properties:
+            name:
+              type: string
+            avatar:
+              type: [string, "null"]
+        image:
+          type: [string, "null"]
+          format: uri
+        imageUrl:
+          type: [string, "null"]
+          format: uri
+        createdAt:
+          type: [string, "null"]
+          format: date-time
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+    ProjectResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Project"
+    ProjectPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Project"
+            meta:
+              type: object
+              required: [limit, nextCursor, appliedFilters]
+              properties:
+                total:
+                  type: integer
+                  minimum: 0
+                  description: Present when count aggregation covers the applied filters.
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                nextCursor:
+                  type: [string, "null"]
+                appliedFilters:
+                  $ref: "#/components/schemas/MarketplaceAppliedFilters"
+    ServiceCategoryResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                type: object
+                required: [slug, label]
+                additionalProperties: false
+                properties:
+                  slug:
+                    type: string
+                    enum:
+                      [
+                        design-creative,
+                        video-animation,
+                        writing-translation,
+                        digital-marketing,
+                        tech-development,
+                        ai-automation,
+                        business-legal,
+                      ]
+                  label:
+                    type: string
+    ServiceAsset:
+      type: object
+      additionalProperties: false
+      required: [url, publicId]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Must belong to the configured Cloudinary cloud.
+        publicId:
+          type: string
+    ServiceWrite:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          title,
+          description,
+          category,
+          price,
+          deliveryDays,
+          revisions,
+          images,
+          skills,
+        ]
+      properties:
+        title:
+          type: string
+          minLength: 4
+          maxLength: 100
+        description:
+          type: string
+          minLength: 20
+          maxLength: 2000
+        category:
+          type: string
+          enum:
+            [
+              design-creative,
+              video-animation,
+              writing-translation,
+              digital-marketing,
+              tech-development,
+              ai-automation,
+              business-legal,
+            ]
+        price:
+          type: number
+          minimum: 1
+          maximum: 100000000
+        deliveryDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+        revisions:
+          type: integer
+          minimum: 0
+          maximum: 100
+        images:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/ServiceAsset"
+        skills:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+            maxLength: 40
+    ServiceUpdate:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      description: Partial service fields; owner, status, ratings, counters, and timestamps are server-controlled.
+      properties:
+        title:
+          type: string
+          minLength: 4
+          maxLength: 100
+        description:
+          type: string
+          minLength: 20
+          maxLength: 2000
+        category:
+          type: string
+          enum:
+            [
+              design-creative,
+              video-animation,
+              writing-translation,
+              digital-marketing,
+              tech-development,
+              ai-automation,
+              business-legal,
+            ]
+        price:
+          type: number
+          minimum: 1
+          maximum: 100000000
+        deliveryDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+        revisions:
+          type: integer
+          minimum: 0
+          maximum: 100
+        images:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/ServiceAsset"
+        skills:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+            maxLength: 40
+    Service:
+      allOf:
+        - $ref: "#/components/schemas/ServiceWrite"
+        - type: object
+          required:
+            [
+              id,
+              ownerId,
+              status,
+              ratingAvg,
+              ratingCount,
+              categoryLabel,
+              owner,
+              createdAt,
+              updatedAt,
+            ]
+          properties:
+            id:
+              type: string
+            ownerId:
+              type: string
+            status:
+              const: published
+            ratingAvg:
+              type: number
+            ratingCount:
+              type: integer
+            categoryLabel:
+              type: string
+            owner:
+              type: object
+              required: [id, displayName, photoURL, ratingAvg]
+              properties:
+                id:
+                  type: string
+                displayName:
+                  type: string
+                photoURL:
+                  type: [string, "null"]
+                ratingAvg:
+                  type: number
+            authorUid:
+              type: string
+            author:
+              type: object
+              required: [name, avatar]
+              properties:
+                name:
+                  type: string
+                avatar:
+                  type: [string, "null"]
+            image:
+              type: [string, "null"]
+              format: uri
+            imageUrl:
+              type: [string, "null"]
+              format: uri
+            createdAt:
+              type: [string, "null"]
+              format: date-time
+            updatedAt:
+              type: [string, "null"]
+              format: date-time
+    ServiceResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Service"
+    ServicePageResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Service"
+            meta:
+              type: object
+              required: [limit, nextCursor, appliedFilters]
+              properties:
+                total:
+                  type: integer
+                  minimum: 0
+                  description: Present when count aggregation covers the applied filters.
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                nextCursor:
+                  type: [string, "null"]
+                appliedFilters:
+                  $ref: "#/components/schemas/MarketplaceAppliedFilters"
+    MarketplaceAppliedFilters:
+      type: object
+      required: [q, category, skills, minPrice, maxPrice, sort]
+      properties:
+        q:
+          type: string
+          maxLength: 80
+        category:
+          type: [string, "null"]
+        skills:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 40
+        minPrice:
+          type: [number, "null"]
+        maxPrice:
+          type: [number, "null"]
+        sort:
+          type: string
+          enum: [newest, oldest, price_asc, price_desc, popular]
+    LikeResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [liked, count]
+              properties:
+                liked:
+                  type: boolean
+                count:
+                  type: integer
+    Comment:
+      type: object
+      required: [id, projectId, authorId, userName, userAvatar, text, createdAt]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        authorId:
+          type: string
+        userName:
+          type: string
+        userAvatar:
+          type: [string, "null"]
+        text:
+          type: string
+        createdAt:
+          type: [string, "null"]
+          format: date-time
+    CommentResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Comment"
+    CommentPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Comment"
+            meta:
+              type: object
+              required: [nextCursor]
+              properties:
+                nextCursor:
+                  type: [string, "null"]
+    JobWrite:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          title,
+          description,
+          category,
+          skills,
+          budgetMin,
+          budgetMax,
+          projectDuration,
+          jobType,
+        ]
+      properties:
+        title:
+          type: string
+          minLength: 4
+          maxLength: 120
+        description:
+          type: string
+          minLength: 10
+          maxLength: 4000
+        category:
+          type: string
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          maxLength: 64
+        skills:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+            minLength: 1
+            maxLength: 40
+        budgetMin:
+          type: number
+          minimum: 0
+          maximum: 100000000
+        budgetMax:
+          type: number
+          minimum: 0
+          maximum: 100000000
+        budgetType:
+          type: string
+          enum: [fixed, hourly]
+          default: fixed
+        jobType:
+          type: string
+          enum: [freelance, part-time, full-time, contract, internship]
+        projectDuration:
+          type: string
+          minLength: 1
+          maxLength: 80
+        deadlineDate:
+          type: string
+          format: date
+        deadlineDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+        experienceLevel:
+          type: string
+          enum: [entry, intermediate, expert]
+        workMode:
+          type: string
+          enum: [remote, hybrid, onsite]
+          default: remote
+        additionalDetails:
+          type: string
+          maxLength: 2000
+        location:
+          type: [string, "null"]
+          maxLength: 120
+    JobUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 4
+          maxLength: 120
+        description:
+          type: string
+          minLength: 10
+          maxLength: 4000
+        category:
+          type: string
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          maxLength: 64
+        skills:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+            minLength: 1
+            maxLength: 40
+        budgetMin:
+          type: number
+          minimum: 0
+          maximum: 100000000
+        budgetMax:
+          type: number
+          minimum: 0
+          maximum: 100000000
+        budgetType:
+          type: string
+          enum: [fixed, hourly]
+        jobType:
+          type: string
+          enum: [freelance, part-time, full-time, contract, internship]
+        projectDuration:
+          type: [string, "null"]
+          minLength: 1
+          maxLength: 80
+        deadlineDate:
+          type: [string, "null"]
+          format: date
+        deadlineDays:
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 365
+        experienceLevel:
+          type: [string, "null"]
+          enum: [entry, intermediate, expert, null]
+        workMode:
+          type: string
+          enum: [remote, hybrid, onsite]
+        additionalDetails:
+          type: [string, "null"]
+          maxLength: 2000
+        location:
+          type: [string, "null"]
+          maxLength: 120
+        status:
+          type: string
+          enum: [open, closed, filled]
+    Job:
+      type: object
+      required:
+        [
+          id,
+          postedBy,
+          owner,
+          title,
+          description,
+          category,
+          skills,
+          budgetMin,
+          budgetMax,
+          budgetType,
+          jobType,
+          projectDuration,
+          deadlineDays,
+          deadlineDate,
+          experienceLevel,
+          workMode,
+          additionalDetails,
+          location,
+          status,
+          applicationsCount,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id:
+          type: string
+        postedBy:
+          type: string
+        owner:
+          type: object
+          required: [id, displayName, photoURL]
+          properties:
+            id:
+              type: string
+            displayName:
+              type: string
+            photoURL:
+              type: [string, "null"]
+              format: uri
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        budgetMin:
+          type: number
+        budgetMax:
+          type: number
+        budgetType:
+          type: string
+          enum: [fixed, hourly]
+        jobType:
+          type: string
+          enum: [freelance, part-time, full-time, contract, internship]
+        projectDuration:
+          type: [string, "null"]
+        deadlineDays:
+          type: [integer, "null"]
+        deadlineDate:
+          type: [string, "null"]
+          format: date
+        experienceLevel:
+          type: [string, "null"]
+          enum: [entry, intermediate, expert, null]
+        workMode:
+          type: [string, "null"]
+          enum: [remote, hybrid, onsite, null]
+        additionalDetails:
+          type: [string, "null"]
+        location:
+          type: [string, "null"]
+        status:
+          type: string
+          enum: [open, closed, filled]
+        applicationsCount:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: [string, "null"]
+          format: date-time
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+    JobResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Job"
+    JobPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Job"
+            meta:
+              type: object
+              required: [limit, nextCursor, appliedFilters]
+              properties:
+                total:
+                  type: integer
+                  minimum: 0
+                  description: Present when count aggregation covers all applied filters.
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                nextCursor:
+                  type: [string, "null"]
+                appliedFilters:
+                  type: object
+                  properties:
+                    q:
+                      type: string
+                    category:
+                      type: [string, "null"]
+                    skills:
+                      type: array
+                      items:
+                        type: string
+                    minPrice:
+                      type: [number, "null"]
+                    maxPrice:
+                      type: [number, "null"]
+                    jobType:
+                      type: [string, "null"]
+                    location:
+                      type: [string, "null"]
+                    sort:
+                      type: string
+                      enum: [newest, oldest, price_asc, price_desc, popular]
+    ApplicationWrite:
+      type: object
+      additionalProperties: false
+      required: [coverLetter, proposedRate]
+      properties:
+        coverLetter:
+          type: string
+          minLength: 10
+          maxLength: 2000
+        proposedRate:
+          type: number
+          minimum: 0
+          maximum: 100000000
+    ApplicationStatusUpdate:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [shortlisted, rejected, hired, withdrawn]
+    Application:
+      type: object
+      required:
+        [
+          id,
+          jobId,
+          applicantId,
+          coverLetter,
+          proposedRate,
+          status,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id:
+          type: string
+        jobId:
+          type: string
+        applicantId:
+          type: string
+        coverLetter:
+          type: string
+        proposedRate:
+          type: number
+        status:
+          type: string
+          enum: [submitted, shortlisted, rejected, hired, withdrawn]
+        createdAt:
+          type: [string, "null"]
+          format: date-time
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+        job:
+          type: [object, "null"]
+          required: [id, title, status]
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+            status:
+              type: string
+              enum: [open, closed, filled, deleted]
+        applicant:
+          type: [object, "null"]
+          required: [id, displayName, photoURL]
+          properties:
+            id:
+              type: string
+            displayName:
+              type: string
+            photoURL:
+              type: [string, "null"]
+              format: uri
+    ApplicationResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Application"
+    ApplicationPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Application"
+            meta:
+              type: object
+              required: [total, limit, nextCursor]
+              properties:
+                total:
+                  type: integer
+                  minimum: 0
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                nextCursor:
+                  type: [string, "null"]
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          const: false
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items: {}
+            requestId:
+              type: string

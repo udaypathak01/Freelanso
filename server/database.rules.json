@@ -1,0 +1,66 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "userConversations": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+    "notifications": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+    "conversations": {
+      "$conversationId": {
+        ".read": "auth != null && data.child('participantsMap').child(auth.uid).val() === true",
+        "lastRead": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('conversations').child($conversationId).child('participantsMap').child(auth.uid).val() === true",
+            ".validate": "newData.isNumber()"
+          }
+        }
+      }
+    },
+    "messages": {
+      "$conversationId": {
+        ".read": "auth != null && root.child('conversations').child($conversationId).child('participantsMap').child(auth.uid).val() === true",
+        ".write": false
+      }
+    },
+    "typing": {
+      "$conversationId": {
+        ".read": "auth != null && root.child('conversations').child($conversationId).child('participantsMap').child(auth.uid).val() === true",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && root.child('conversations').child($conversationId).child('participantsMap').child(auth.uid).val() === true",
+          ".validate": "newData.isBoolean()"
+        }
+      }
+    },
+    "readReceipts": {
+      "$conversationId": {
+        ".read": "auth != null && root.child('conversations').child($conversationId).child('participantsMap').child(auth.uid).val() === true",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && root.child('conversations').child($conversationId).child('participantsMap').child(auth.uid).val() === true",
+          ".validate": "newData.isNumber()"
+        }
+      }
+    },
+    "presence": {
+      "$uid": {
+        ".read": "auth != null",
+        "lastSeen": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.isNumber()"
+        },
+        "connections": {
+          "$connectionId": {
+            ".write": "auth != null && auth.uid === $uid",
+            ".validate": "newData.isBoolean()"
+          }
+        }
+      }
+    }
+  }
+}

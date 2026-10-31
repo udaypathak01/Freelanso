@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Color Tokens ── */
+  --color-bg:     #09090B;
+  --color-s1:     #0F0F13;
+  --color-s2:     #16161C;
+  --color-s3:     #1E1E26;
+  --color-acc:    #0066FF;
+  --color-acc2:   #3B82F6;
+  --color-t0:     #F0EDE8;
+  --color-t1:     #A0A0B4;
+  --color-t2:     #55556A;
+  --color-green:  #10B981;
+  --color-gold:   #F5C842;
+  --color-purple: #A78BFA;
+  --color-blue:   #60A5FA;
+
+  /* ── Border Radius ── */
+  --radius-card: 18px;
+  --radius-xl:   22px;
+  --radius-pill: 100px;
+
+  /* ── Font Families ── */
+  --font-syne:    'Syne', sans-serif;
+  --font-jakarta: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* ── Global base styles ── */
+html, body {
+  background-color: #09090B;
+  color: #F0EDE8;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar        { width: 4px; }
+::-webkit-scrollbar-track  { background: #0F0F13; }
+::-webkit-scrollbar-thumb  { background: #1E1E26; border-radius: 4px; }
+
+/* ── Mobile: hide scrollbar entirely ── */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; }
+}
+
+/* ── Utilities ── */
+.bg-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+@keyframes scale-in {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Safe area padding for bottom nav ── */
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 8px);
+}
+
