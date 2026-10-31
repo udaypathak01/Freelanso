@@ -31,6 +31,10 @@ vi.mock("../src/modules/users/users.repository.js", () => ({
 afterEach(() => vi.restoreAllMocks());
 
 describe("foundation endpoints", () => {
+  it("answers root HEAD probes without requiring a forwarded HTTPS header", async () => {
+    await request(app).head("/").expect(204);
+  });
+
   it("returns liveness and readiness success envelopes", async () => {
     vi.spyOn(firestore, "listCollections").mockResolvedValue([]);
     await request(app)

@@ -48,6 +48,20 @@ describe("environment validation", () => {
     });
   });
 
+  it("trusts Render's single proxy hop by default but honors explicit settings", () => {
+    const renderEnv = {
+      ...validEnv,
+      NODE_ENV: "production",
+      CORS_ALLOWED_ORIGINS: "https://freelanso.example",
+      RENDER: "true",
+    };
+
+    expect(parseEnv(renderEnv).trustProxy).toBe(1);
+    expect(parseEnv({ ...renderEnv, TRUST_PROXY: "false" }).trustProxy).toBe(
+      false,
+    );
+  });
+
   it("treats false emulator host values as disabled", () => {
     expect(
       parseEnv({

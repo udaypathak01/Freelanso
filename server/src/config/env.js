@@ -27,6 +27,7 @@ const schema = z
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
+    RENDER: z.preprocess(emptyToUndefined, z.string().optional()),
     PORT: z.coerce.number().int().min(1).max(65535).default(5000),
     CORS_ALLOWED_ORIGINS: z
       .string()
@@ -190,7 +191,11 @@ const schema = z
   });
 
 export function parseEnv(input) {
-  const result = schema.safeParse(input);
+  const result = schema.safeParse({
+    ...input,
+    TRUST_PROXY:
+      input.TRUST_PROXY ?? (input.RENDER === "true" ? "1" : undefined),
+  });
   if (!result.success) {
     const issues = result.error.issues
       .map(

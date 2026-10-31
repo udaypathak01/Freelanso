@@ -53,6 +53,7 @@ app.use(
   }),
 );
 app.use(helmet());
+app.head("/", (_req, res) => res.sendStatus(204));
 app.use((req, res, next) => {
   if (env.nodeEnv === "production" && !req.secure) {
     const error = new Error("HTTPS required");

@@ -59,8 +59,11 @@ candidate result page remains available through deterministic ranking.
 
 The server validates configuration during startup, listens on `PORT` (default
 5000), and enforces HTTPS when `NODE_ENV=production`. `TRUST_PROXY` defaults to
-`false`; set it only to the known proxy hop count or a deliberate Express trust
-proxy value for the deployment topology.
+`false`, except on Render where it defaults to the platform's single proxy hop;
+an explicit value overrides either default. For other deployments, set it only
+to the known proxy hop count or a deliberate Express trust proxy value for the
+deployment topology. Root `HEAD` requests are answered for platform health
+probes before HTTPS enforcement.
 
 ## Endpoints
 
