@@ -24,8 +24,8 @@
     "seed:jobs": "node src/scripts/seedJobs.js",
     "migrate:categories": "node src/scripts/migrateCategories.js",
     "migrate:conversations": "node src/scripts/migrateConversations.js",
-    "test:emu": "firebase emulators:exec --project demo-freelanso-test --only auth,firestore,database \"npm test\"",
-    "prepare": "cd .. && husky server/.husky"
+    "test:emu": "firebase emulators:exec --project demo-freelanso-test --only auth,firestore,database \"npm test\""
+    
   },
   "dependencies": {
     "compression": "1.8.2",
