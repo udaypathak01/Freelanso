@@ -254,9 +254,8 @@ export default function Explore() {
       <div className="flex-1 flex flex-col min-w-0" ref={containerRef}>
 
         {/* MOBILE TOP BAR */}
-        <div className="lg:hidden sticky top-0 z-50 bg-[#09090B]/95 backdrop-blur-xl border-b border-white/5 px-4 py-3 flex items-center justify-between">
-          <span className="font-syne font-black text-white text-base">freelan<span className="text-[#0066FF]">so</span></span>
-          <div className="flex-1 mx-3 relative">
+        <div className="lg:hidden sticky top-[58px] z-40 bg-[#09090B]/95 backdrop-blur-xl border-b border-white/5 px-4 py-3 flex items-center justify-between">
+          <div className="flex-1 relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#555]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             <input
               type="text"

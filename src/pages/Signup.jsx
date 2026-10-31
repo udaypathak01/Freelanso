@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { gsap } from 'gsap'
 import { auth } from '../lib/auth'
 import { apiRequest } from '../lib/api'
@@ -19,6 +19,7 @@ const TRUST_BADGES = [
 
 export default function Signup() {
   const navigate = useNavigate()
+  const location = useLocation()
   const cardRef  = useRef(null)
   const errorRef = useRef(null)
   const nameWrapRef  = useRef(null)
@@ -35,6 +36,18 @@ export default function Signup() {
   const nameField  = useFieldGsap(nameWrapRef)
   const emailField = useFieldGsap(emailWrapRef)
   const pwField    = useFieldGsap(pwWrapRef)
+
+  const navigateAfterAuth = () => {
+    const from = location.state?.from
+    const returnPath =
+      typeof from?.pathname === 'string' &&
+      from.pathname.startsWith('/') &&
+      !from.pathname.startsWith('//') &&
+      !['/login', '/signup'].includes(from.pathname)
+        ? `${from.pathname}${from.search || ''}${from.hash || ''}`
+        : '/explore'
+    navigate(returnPath, { replace: true })
+  }
 
   /* ─ entrance animation ─ */
   useEffect(() => {
@@ -98,7 +111,7 @@ export default function Signup() {
     try {
       const credential = await auth.signup(email.trim().toLowerCase(), pw, name.trim())
       await assignInitialRole(credential.user, role)
-      navigate('/explore')
+      navigateAfterAuth()
     } catch (err) {
        setError(err.message.replace('Firebase:', ''))
     } finally {
@@ -114,7 +127,7 @@ export default function Signup() {
       if (!['freelancer', 'client', 'admin'].includes(tokenResult.claims.role)) {
         await assignInitialRole(credential.user, role)
       }
-      navigate('/explore')
+      navigateAfterAuth()
     } catch (err) {
       setError(err.message.replace('Firebase:', ''))
     }

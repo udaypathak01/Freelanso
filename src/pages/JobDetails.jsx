@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { gsap } from "gsap";
 import Sidebar from "../components/Sidebar";
 import { applyToJob, fetchJob } from "../lib/jobData";
@@ -13,6 +13,7 @@ import {
 export default function JobDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,7 +28,17 @@ export default function JobDetails() {
   const [applicationsError, setApplicationsError] = useState("");
   const [updatingApplication, setUpdatingApplication] = useState("");
   const containerRef = useRef(null);
-  const user = auth.getUser();
+  const [user, setUser] = useState(() => auth.getUser());
+
+  useEffect(() => {
+    const syncUser = () => setUser(auth.getUser());
+    window.addEventListener("auth-change", syncUser);
+    window.addEventListener("storage", syncUser);
+    return () => {
+      window.removeEventListener("auth-change", syncUser);
+      window.removeEventListener("storage", syncUser);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -112,6 +123,10 @@ export default function JobDetails() {
 
   async function handleApply(event) {
     event.preventDefault();
+    if (!auth.getUser()?.uid) {
+      navigate("/login", { state: { from: location } });
+      return;
+    }
     setSubmitting(true);
     setApplicationError("");
     try {
@@ -374,6 +389,30 @@ export default function JobDetails() {
                 className="w-full rounded-xl bg-[#0066FF] py-3 text-xs font-black uppercase tracking-wider transition hover:bg-[#0055ee]"
               >
                 Edit post
+              </button>
+            </div>
+          ) : job.status === "open" && !applicationSent && !user?.uid ? (
+            <div className="space-y-3 rounded-2xl border border-white/10 bg-[#121216] p-5 text-center">
+              <p className="text-sm font-bold text-[#aaa]">
+                Log in or create an account to apply for this job.
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  navigate("/login", { state: { from: location } })
+                }
+                className="w-full rounded-xl bg-[#0066FF] py-3 text-xs font-black uppercase tracking-wider transition hover:bg-[#0055ee]"
+              >
+                Log in to apply
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  navigate("/signup", { state: { from: location } })
+                }
+                className="w-full rounded-xl border border-white/10 py-3 text-xs font-black uppercase tracking-wider text-[#aaa] transition hover:border-[#0066FF]/40 hover:text-white"
+              >
+                Create an account
               </button>
             </div>
           ) : job.status === "open" && !applicationSent ? (

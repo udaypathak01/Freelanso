@@ -232,7 +232,7 @@ export default function Dashboard() {
 
   return (
     <div
-      className="flex h-screen bg-[#09090B] text-white overflow-hidden"
+      className="flex h-[calc(100vh-58px)] lg:h-screen bg-[#09090B] text-white overflow-hidden"
       ref={containerRef}
     >
       <div

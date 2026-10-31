@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { gsap } from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { auth } from '../lib/auth'
@@ -13,6 +13,7 @@ export function useFieldGsap(wrapperRef) {
 
 export default function Login() {
   const navigate  = useNavigate()
+  const location = useLocation()
   const cardRef   = useRef(null)
   const fieldsRef = useRef(null)
   const errorRef  = useRef(null)
@@ -60,7 +61,7 @@ export default function Login() {
 
     try {
       await auth.login(email.trim(), pw)
-      navigate('/explore')
+      navigateAfterAuth()
     } catch (err) {
       setError(err.message.replace('Firebase:', ''))
     } finally {
@@ -72,10 +73,22 @@ export default function Login() {
     setError('')
     try {
       await auth.googleLogin()
-      navigate('/explore')
+      navigateAfterAuth()
     } catch (err) {
       setError(err.message.replace('Firebase:', ''))
     }
+  }
+
+  const navigateAfterAuth = () => {
+    const from = location.state?.from
+    const returnPath =
+      typeof from?.pathname === 'string' &&
+      from.pathname.startsWith('/') &&
+      !from.pathname.startsWith('//') &&
+      !['/login', '/signup'].includes(from.pathname)
+        ? `${from.pathname}${from.search || ''}${from.hash || ''}`
+        : '/explore'
+    navigate(returnPath, { replace: true })
   }
 
   return (

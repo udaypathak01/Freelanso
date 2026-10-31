@@ -1,6 +1,4 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { auth } from '../lib/auth'
-import useNotifications from '../lib/useNotifications'
 
 const TABS = [
   {
@@ -23,6 +21,16 @@ const TABS = [
     )
   },
   {
+    label: 'Jobs',
+    to: '/jobs',
+    icon: (active) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="7" width="18" height="13" rx="2" />
+        <path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18m-12 0v2h6v-2" strokeWidth={active ? "2.5" : "2"} />
+      </svg>
+    )
+  },
+  {
     label: 'Post',
     to: '/post-work',
     icon: () => (
@@ -36,12 +44,14 @@ const TABS = [
     special: true
   },
   {
-    label: 'Alerts',
-    to: '/notifications',
+    label: 'Dashboard',
+    to: '/dashboard',
     icon: (active) => (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-        <path d="M10 21h4" />
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="8" height="8" rx="1.5" fill={active ? 'currentColor' : 'none'} />
+        <rect x="13" y="3" width="8" height="5" rx="1.5" />
+        <rect x="13" y="10" width="8" height="11" rx="1.5" />
+        <rect x="3" y="13" width="8" height="8" rx="1.5" />
       </svg>
     )
   },
@@ -69,34 +79,28 @@ const TABS = [
 export default function MobileTabBar() {
   const navigate = useNavigate()
   const location = useLocation()
-  const user = auth.getUser()
-  const { unreadCount: unreadNotifications } = useNotifications(user?.uid)
 
   // Don't show on auth pages
   const hideOn = ['/login', '/signup']
   if (hideOn.includes(location.pathname)) return null
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-[200] lg:hidden bg-[#09090B]/95 backdrop-blur-xl border-t border-white/[0.06] flex items-end justify-around px-2 pb-[env(safe-area-inset-bottom)] pt-2" style={{paddingBottom: 'max(env(safe-area-inset-bottom), 8px)'}}>
+    <nav aria-label="Main navigation" className="fixed bottom-0 inset-x-0 z-[200] lg:hidden bg-[#09090B]/95 backdrop-blur-xl border-t border-white/[0.06] flex items-end justify-around px-1 pb-[env(safe-area-inset-bottom)] pt-2" style={{paddingBottom: 'max(env(safe-area-inset-bottom), 8px)'}}>
       {TABS.map(tab => {
         const isActive = tab.to === '/' ? location.pathname === '/' : location.pathname.startsWith(tab.to)
         return (
           <button
             key={tab.label}
             onClick={() => navigate(tab.to)}
-            className="flex flex-col items-center gap-1 flex-1 py-1 transition-all active:scale-90"
+            aria-label={tab.label === 'Jobs' ? 'Browse jobs' : tab.label}
+            className="flex min-w-0 flex-1 flex-col items-center gap-1 py-1 transition-all active:scale-90"
             style={{WebkitTapHighlightColor: 'transparent'}}
           >
             <span className={`relative ${tab.special ? '' : isActive ? 'text-[#0066FF]' : 'text-[#555]'}`}>
               {tab.icon(isActive)}
-              {tab.to === '/notifications' && unreadNotifications > 0 && (
-                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#0066FF] px-1 text-[9px] font-black text-white">
-                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
-                </span>
-              )}
             </span>
             {!tab.special && (
-              <span className={`text-[9px] font-black uppercase tracking-wider transition-colors ${isActive ? 'text-[#0066FF]' : 'text-[#444]'}`}>
+              <span className={`whitespace-nowrap text-[8px] font-black uppercase tracking-wide transition-colors ${isActive ? 'text-[#0066FF]' : 'text-[#444]'}`}>
                 {tab.label}
               </span>
             )}

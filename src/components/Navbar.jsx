@@ -4,6 +4,7 @@ import { gsap } from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { auth } from '../lib/auth'
 import Avatar from './Avatar'
+import useNotifications from '../lib/useNotifications'
 
 const NAV_LINKS = [
   { label: 'Home', to: '/' },
@@ -12,7 +13,13 @@ const NAV_LINKS = [
   { label: 'How it Works', to: '/how-it-works' },
 ]
 
-export default function Navbar() {
+const MOBILE_NAV_LINKS = [
+  ...NAV_LINKS,
+  { label: 'Browse Jobs', to: '/jobs' },
+  { label: 'Dashboard', to: '/dashboard' },
+]
+
+export default function Navbar({ mobileOnly = false }) {
   const navigate = useNavigate()
   const location = useLocation()
   const containerRef = useRef(null)
@@ -21,6 +28,7 @@ export default function Navbar() {
   const [user, setUser] = useState(() => auth.getUser())
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { unreadCount } = useNotifications(user?.uid)
 
   /* ── Scroll + auth listeners (non-GSAP, keep in useEffect-style via useGSAP cleanup) ── */
   useGSAP(() => {
@@ -70,6 +78,7 @@ export default function Navbar() {
         'bg-bg/90 backdrop-blur-xl border-b border-white/5',
         'transition-shadow duration-300',
         scrolled ? 'shadow-[0_1px_0_rgba(255,255,255,0.06)]' : '',
+        mobileOnly ? 'md:hidden' : '',
       ].join(' ')}
     >
       <div className="max-w-[1280px] mx-auto w-full flex items-center justify-between px-8">
@@ -137,23 +146,42 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* HAMBURGER */}
-        <button
-          className="md:hidden flex flex-col justify-center items-center gap-[5px] w-9 h-9 rounded-lg hover:bg-s3 transition-colors"
-          onClick={() => setMobileOpen(o => !o)}
-          aria-label="Toggle menu"
-        >
-          <span className={['block w-5 h-[1.5px] bg-t0 transition-all duration-300 origin-center', mobileOpen ? 'rotate-45 translate-y-[6.5px]' : ''].join(' ')} />
-          <span className={['block w-5 h-[1.5px] bg-t0 transition-all duration-300', mobileOpen ? 'opacity-0 scale-x-0' : ''].join(' ')} />
-          <span className={['block w-5 h-[1.5px] bg-t0 transition-all duration-300 origin-center', mobileOpen ? '-rotate-45 -translate-y-[6.5px]' : ''].join(' ')} />
-        </button>
+        {/* MOBILE ACTIONS */}
+        <div className="md:hidden flex items-center gap-1">
+          <button
+            type="button"
+            className="relative flex h-9 w-9 items-center justify-center rounded-lg text-t1 transition-colors hover:bg-s3 hover:text-white"
+            onClick={() => navigate('/notifications')}
+            aria-label={unreadCount ? `${unreadCount} unread notifications` : 'Notifications'}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+              <path d="M10 21h4" />
+            </svg>
+            {unreadCount > 0 && (
+              <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#0066FF] px-1 text-[9px] font-black text-white">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+          <button
+            className="flex h-9 w-9 flex-col items-center justify-center gap-[5px] rounded-lg transition-colors hover:bg-s3"
+            onClick={() => setMobileOpen(o => !o)}
+            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileOpen}
+          >
+            <span className={['block w-5 h-[1.5px] bg-t0 transition-all duration-300 origin-center', mobileOpen ? 'rotate-45 translate-y-[6.5px]' : ''].join(' ')} />
+            <span className={['block w-5 h-[1.5px] bg-t0 transition-all duration-300', mobileOpen ? 'opacity-0 scale-x-0' : ''].join(' ')} />
+            <span className={['block w-5 h-[1.5px] bg-t0 transition-all duration-300 origin-center', mobileOpen ? '-rotate-45 -translate-y-[6.5px]' : ''].join(' ')} />
+          </button>
+        </div>
       </div>
 
       {/* MOBILE MENU */}
       {mobileOpen && (
         <div ref={mobileMenuRef} className="mobile-menu md:hidden absolute top-[58px] left-0 right-0 bg-s1 border-b border-white/5 p-4 z-40">
           <div className="flex flex-col gap-1 mb-4">
-            {NAV_LINKS.map((link) => (
+            {MOBILE_NAV_LINKS.map((link) => (
               <Link
                 key={link.to}
                 to={link.to}

@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import MobileTabBar from './components/MobileTabBar'
+import NotificationToast from './components/NotificationToast'
 import ProtectedRoute from './components/ProtectedRoute'
 import Footer from './components/Footer'
 
@@ -34,7 +35,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-bg text-t0 flex flex-col">
-      {!shouldHideNavbar && <Navbar />}
+      <Navbar mobileOnly={shouldHideNavbar} />
       <main className="flex-1 w-full pb-20 lg:pb-0">
         <Suspense fallback={<div className="min-h-[40vh] animate-pulse bg-bg" />}>
           <Routes>
@@ -109,6 +110,7 @@ function App() {
       </main>
       {!shouldHideNavbar && <Footer />}
       <MobileTabBar />
+      <NotificationToast />
     </div>
   )
 }
